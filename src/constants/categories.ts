@@ -6,4 +6,5 @@ export const categories = [
   "문화",
   "건강",
 ] as const;
+
 export type Category = (typeof categories)[number];

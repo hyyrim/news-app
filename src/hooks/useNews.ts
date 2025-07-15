@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchNewsFromNaver } from "@/lib/api";
+import { NewsItem } from "../lib/types";
 
-export function useNews(category: string) {
-  const { data, isLoading } = useQuery({
-    queryKey: ["news", category],
-    queryFn: () => fetchNewsFromNaver(category),
-    staleTime: 1000 * 60 * 3, // 3분 캐싱
+export const useNews = (query: string) => {
+  return useQuery<NewsItem[]>({
+    queryKey: ["news", query],
+    queryFn: async () => {
+      const res = await fetch(`/api/news?query=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error("Failed to fetch news");
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 5, // 5분 캐싱
   });
-
-  return { data, isLoading };
-}
+};
