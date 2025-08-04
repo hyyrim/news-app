@@ -1,35 +1,39 @@
-import { decode } from "html-entities";
 import { NextRequest } from "next/server";
 
-const NAVER_CLIENT_ID = process.env.NAVER_CLIENT_ID!;
-const NAVER_CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET!;
+const NYT_API_KEY = process.env.NYT_API_KEY!;
+const BASE_URL = "https://api.nytimes.com/svc/topstories/v2";
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = req.nextUrl;
-  const query = searchParams.get("query") ?? "";
-  const display = searchParams.get("display") ?? "10";
-  const start = searchParams.get("start") ?? "1";
+  const section = req.nextUrl.searchParams.get("section") ?? "home";
 
-  const url = new URL("https://openapi.naver.com/v1/search/news.json");
-  url.searchParams.set("query", query);
-  url.searchParams.set("display", display);
-  url.searchParams.set("start", start);
-  url.searchParams.set("sort", "date");
+  const url = `${BASE_URL}/${section}.json?api-key=${NYT_API_KEY}`;
+  const res = await fetch(url);
 
-  const res = await fetch(url.toString(), {
-    headers: {
-      "X-Naver-Client-Id": NAVER_CLIENT_ID,
-      "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
-    },
-  });
+  if (!res.ok) {
+    return new Response("NYT API fetch error", { status: 500 });
+  }
 
   const data = await res.json();
 
-  const cleanedItems = data.items.map((item: any) => ({
-    ...item,
-    title: decode(item.title.replace(/<[^>]+>/g, "")),
-    description: decode(item.description.replace(/<[^>]+>/g, "")),
+  // 1. 유효한 뉴스만 필터링
+  const validItems = data.results.filter((item: any) => {
+    return (
+      item.title?.trim() &&
+      item.abstract?.trim() &&
+      item.url?.trim() &&
+      item.multimedia?.[0]?.url
+    );
+  });
+
+  // 2. 정제된 데이터 매핑
+  const items = validItems.map((item: any) => ({
+    title: item.title,
+    abstract: item.abstract,
+    byline: item.byline,
+    url: item.url,
+    published_date: item.published_date,
+    image: item.multimedia?.[0]?.url,
   }));
 
-  return Response.json(cleanedItems);
+  return Response.json(items);
 }

@@ -1,7 +1,8 @@
 export interface NewsItem {
   title: string;
-  originallink: string;
-  link: string;
-  description: string;
-  pubDate: string;
+  abstract: string;
+  url: string;
+  byline: string;
+  published_date: string;
+  image: string | null;
 }

@@ -1,14 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { NewsItem } from "../lib/types";
+import { NewsItem } from "@/lib/types";
 
-export const useNews = (query: string) => {
+export const useNews = (section: string) => {
   return useQuery<NewsItem[]>({
-    queryKey: ["news", query],
+    queryKey: ["nyt-news", section],
     queryFn: async () => {
-      const res = await fetch(`/api/news?query=${encodeURIComponent(query)}`);
+      const res = await fetch(`/api/news?section=${section}`);
       if (!res.ok) throw new Error("Failed to fetch news");
       return res.json();
     },
-    staleTime: 1000 * 60 * 5, // 5분 캐싱
+    staleTime: 1000 * 60 * 10,
   });
 };
