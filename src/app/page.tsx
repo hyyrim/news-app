@@ -3,6 +3,7 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { useNews } from "@/hooks/useNews";
 import { nytSections } from "@/constants/categories";
+import NewsCard from "@/components/news/NewsCard";
 
 export default function Page() {
   const searchParams = useSearchParams();
@@ -15,6 +16,25 @@ export default function Page() {
     const params = new URLSearchParams(searchParams);
     params.set("section", section);
     router.push(`/?${params.toString()}`, { scroll: false });
+  };
+
+  const playTTS = async (text: string) => {
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+
+    const blob = await res.blob();
+    console.log("▶️ blob size:", blob.size);
+    console.log("▶️ blob type:", blob.type);
+
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+
+    audio.play().catch((err) => {
+      console.error("🎧 오디오 재생 실패:", err);
+    });
   };
 
   return (
@@ -41,25 +61,14 @@ export default function Page() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {data?.map((item) => (
-            <a
+            <NewsCard
               key={item.url}
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block border p-4 rounded-md hover:shadow"
-            >
-              {item.image && (
-                <img
-                  src={item.image}
-                  alt={item.title}
-                  className="w-full h-48 object-cover rounded mb-3"
-                />
-              )}
-
-              <h3 className="font-bold mb-2">{item.title}</h3>
-              <p className="text-sm text-gray-700">{item.abstract}</p>
-              <p className="text-xs text-gray-500 mt-2">{item.byline}</p>
-            </a>
+              title={item.title}
+              abstract={item.abstract}
+              byline={item.byline}
+              image={item.image}
+              url={item.url}
+            />
           ))}
         </div>
       )}
