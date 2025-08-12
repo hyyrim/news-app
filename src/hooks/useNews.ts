@@ -5,7 +5,10 @@ export const useNews = (section: string) => {
   return useQuery<NewsItem[]>({
     queryKey: ["nyt-news", section],
     queryFn: async () => {
-      const res = await fetch(`/api/news?section=${section}`);
+      const normalized = (section || "home").toLowerCase();
+      const res = await fetch(
+        `/api/news?section=${encodeURIComponent(normalized)}`
+      );
       if (!res.ok) throw new Error("Failed to fetch news");
       return res.json();
     },

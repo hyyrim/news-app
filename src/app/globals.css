@@ -3,6 +3,49 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Hide scrollbar utility */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Edge fade overlays for horizontal scroll areas */
+.edge-fade-wrap {
+  position: relative;
+}
+.edge-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 44px;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.edge-fade-visible {
+  opacity: 0.6;
+}
+.edge-fade-left {
+  left: 0;
+  background-image: linear-gradient(
+    to right,
+    color-mix(in oklch, var(--background) 65%, transparent),
+    transparent
+  );
+}
+.edge-fade-right {
+  right: 0;
+  background-image: linear-gradient(
+    to left,
+    color-mix(in oklch, var(--background) 65%, transparent),
+    transparent
+  );
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

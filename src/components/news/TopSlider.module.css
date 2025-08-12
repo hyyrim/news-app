@@ -1,0 +1,19 @@
+.topsliderPagination {
+  position: absolute !important;
+  right: 0.5rem !important;
+  bottom: 0.5rem !important;
+  left: auto !important;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  pointer-events: none;
+  width: auto !important;
+  max-width: max-content;
+  text-align: right !important;
+}
