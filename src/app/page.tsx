@@ -17,8 +17,9 @@ function PageInner() {
   const selected = searchParams.get("section") || "home";
   const { data, isLoading, error } = useNews(selected);
   const setQueue = useAudioQueue((s) => s.setQueue);
+  const currentIndex = useAudioQueue((s) => s.currentIndex);
+  const isPlaying = useAudioQueue((s) => s.isPlaying);
 
-  // Tabs scroll fade state
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const [showLeftFade, setShowLeftFade] = useState(false);
   const [showRightFade, setShowRightFade] = useState(false);
@@ -62,6 +63,23 @@ function PageInner() {
     }));
     setQueue(items);
   }, [data, setQueue]);
+
+  // 재생 중인 뉴스카드가 화면에 보이도록 스크롤
+  useEffect(() => {
+    if (!data?.length) return;
+    if (currentIndex < 0 || currentIndex >= data.length) return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-idx="${currentIndex}"]`
+    );
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const isFullyVisible = rect.top >= 0 && rect.bottom <= vh;
+    if (!isFullyVisible) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [currentIndex, data]);
 
   const handleSelect = (section: string) => {
     const params = new URLSearchParams(searchParams);
@@ -118,16 +136,28 @@ function PageInner() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4">
-          {data?.map((item) => (
-            <NewsCard
-              key={item.url}
-              title={item.title}
-              abstract={item.abstract}
-              byline={item.byline}
-              image={item.image}
-              url={item.url}
-            />
-          ))}
+          {data?.map((item, idx) => {
+            const active = idx === currentIndex;
+            const playing = isPlaying && active;
+            return (
+              <div
+                key={item.url}
+                data-idx={idx}
+                aria-current={playing ? "true" : undefined}
+                className={`rounded-md transition-colors ${
+                  playing ? "bg-accent/10" : active ? "bg-accent/5" : ""
+                }`}
+              >
+                <NewsCard
+                  title={item.title}
+                  abstract={item.abstract}
+                  byline={item.byline}
+                  image={item.image}
+                  url={item.url}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
