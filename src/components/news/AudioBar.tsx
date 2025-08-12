@@ -23,9 +23,12 @@ export default function AudioBar() {
   const { queue, currentIndex, isPlaying, play, pause, next, prev } =
     useAudioQueue();
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const urlCacheRef = useRef<Map<string, string>>(new Map());
+  const userStartedRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
+  const lastItemIdRef = useRef<string | null>(null);
 
   const currentItem = queue[currentIndex];
   const remainingCount = useMemo(
@@ -41,10 +44,14 @@ export default function AudioBar() {
     if (!audioRef.current) audioRef.current = new Audio();
     const audio = audioRef.current;
 
-    const handleEnded = () => next();
+    const handleEnded = () => {
+      audio.pause();
+      next();
+    };
     const handleTime = () => setCurrent(audio.currentTime || 0);
     const handleLoaded = () => setDuration(audio.duration || 0);
     const handleError = () => {
+      audio.pause();
       pause();
       alert("오디오 재생 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.");
     };
@@ -62,35 +69,126 @@ export default function AudioBar() {
     };
   }, [next, pause]);
 
+  // 현재 아이템 변경 시: 캐시 확인 후 소스 설정, 재생 중이면 이어서 재생
   useEffect(() => {
-    setCurrent(0);
-    setDuration(0);
-  }, [currentItem?.id]);
-
-  useEffect(() => {
-    let revokedUrl: string | null = null;
-    const run = async () => {
+    const loadForItem = async () => {
       if (!currentItem) return;
-      if (!isPlaying) return;
-      setLoading(true);
-      try {
-        const url = await fetchTtsUrl(currentItem.text);
-        revokedUrl = url;
-        if (!audioRef.current) audioRef.current = new Audio();
-        audioRef.current.src = url;
-        await audioRef.current.play();
-      } catch {
-        pause();
-        alert("오디오 생성에 실패했어요. 잠시 후 다시 시도해 주세요.");
-      } finally {
-        setLoading(false);
+      const itemId = currentItem.id;
+      const isNewItem = lastItemIdRef.current !== itemId;
+      if (!audioRef.current) audioRef.current = new Audio();
+      const audio = audioRef.current;
+
+      if (isNewItem) {
+        setCurrent(0);
+        setDuration(0);
+        lastItemIdRef.current = itemId;
+      }
+
+      let url = urlCacheRef.current.get(itemId);
+      // 재생 중이 아니거나 사용자 상호작용 이전이면 네트워크 요청을 하지 않음
+      if (!url && !(isPlaying && userStartedRef.current)) {
+        return;
+      }
+
+      if (!url) {
+        setLoading(true);
+        try {
+          url = await fetchTtsUrl(currentItem.text);
+          // 간단한 캐시 크기 제한(최대 6개)
+          if (urlCacheRef.current.size >= 6) {
+            const firstKey = urlCacheRef.current.keys().next().value as
+              | string
+              | undefined;
+            if (firstKey) {
+              const old = urlCacheRef.current.get(firstKey);
+              if (old) URL.revokeObjectURL(old);
+              urlCacheRef.current.delete(firstKey);
+            }
+          }
+          urlCacheRef.current.set(itemId, url);
+        } catch {
+          pause();
+          alert("오디오 생성에 실패했어요. 잠시 후 다시 시도해 주세요.");
+          return;
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      if (url && audio.src !== url) {
+        audio.src = url;
+      }
+
+      if (isPlaying && userStartedRef.current) {
+        try {
+          await audio.play();
+        } catch {}
       }
     };
-    run();
-    return () => {
-      if (revokedUrl) URL.revokeObjectURL(revokedUrl);
+
+    loadForItem();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentItem, currentIndex]);
+
+  // 재생/일시정지 토글: 사용자 상호작용 없으면 자동재생 방지
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const ensureAndPlay = async () => {
+      if (!currentItem) return pause();
+      const itemId = currentItem.id;
+      let url = urlCacheRef.current.get(itemId);
+      if (!url) {
+        try {
+          setLoading(true);
+          url = await fetchTtsUrl(currentItem.text);
+          // 캐시 크기 관리(최대 6개)
+          if (urlCacheRef.current.size >= 6) {
+            const firstKey = urlCacheRef.current.keys().next().value as
+              | string
+              | undefined;
+            if (firstKey) {
+              const old = urlCacheRef.current.get(firstKey);
+              if (old) URL.revokeObjectURL(old);
+              urlCacheRef.current.delete(firstKey);
+            }
+          }
+          urlCacheRef.current.set(itemId, url);
+        } catch {
+          pause();
+          alert("오디오 생성에 실패했어요. 잠시 후 다시 시도해 주세요.");
+          return;
+        } finally {
+          setLoading(false);
+        }
+      }
+      if (audio.src !== url) audio.src = url;
+      audio.play().catch(() => pause());
     };
-  }, [currentIndex, currentItem, currentItem?.text, isPlaying, pause]);
+
+    if (isPlaying) {
+      if (!userStartedRef.current) {
+        // 사용자 제스처 전이면 자동재생 방지
+        pause();
+        return;
+      }
+      void ensureAndPlay();
+    } else {
+      audio.pause();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying]);
+
+  const handlePause = () => {
+    audioRef.current?.pause();
+    pause();
+  };
+
+  const handlePlay = () => {
+    userStartedRef.current = true;
+    play();
+  };
 
   if (!queue.length) return null;
 
@@ -140,7 +238,7 @@ export default function AudioBar() {
           <Button
             variant="default"
             size="icon"
-            onClick={pause}
+            onClick={handlePause}
             aria-label="일시정지"
             disabled={loading}
           >
@@ -150,7 +248,7 @@ export default function AudioBar() {
           <Button
             variant="default"
             size="icon"
-            onClick={play}
+            onClick={handlePlay}
             aria-label="재생"
             disabled={loading || !currentItem}
           >
